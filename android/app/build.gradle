@@ -3,10 +3,10 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 react {
-    // Configuration options
+    autolinkLibrariesWithApp()
 }
 
-def enableProguardInReleaseBuilds = true
+def enableProguardInReleaseBuilds = false
 def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
@@ -15,7 +15,6 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.goldchyplus"
-
     defaultConfig {
         applicationId "com.goldchyplus"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -23,7 +22,6 @@ android {
         versionCode 1
         versionName "1.0.0"
     }
-
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -40,7 +38,6 @@ android {
             }
         }
     }
-
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -48,8 +45,7 @@ android {
         release {
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
-            shrinkResources enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
 }

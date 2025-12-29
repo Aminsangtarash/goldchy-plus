@@ -1,120 +1,250 @@
-import React, {useState, useRef, useCallback} from 'react';
+/**
+ * InquiryScreen
+ */
+
+import React, {useState, useCallback} from 'react';
+import {View, ScrollView, StyleSheet} from 'react-native';
 import {
-  View,
   Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  Animated,
-  Dimensions,
-  Share,
-  I18nManager,
-} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+  AppHeader,
+  PageTitle,
+  TabSelector,
+  SubTabSelector,
+  FeeNotice,
+  Input,
+  Button,
+  PaymentDrawer,
+  ResultModal,
+  BottomTabBar,
+} from '../../components';
+import type {InquiryResultData} from '../../components';
+import {colors} from '../../theme/colors';
+import {spacing} from '../../theme/spacing';
+import {borderRadius} from '../../theme/borderRadius';
 import {InquiryService, WalletService} from '../../services/api';
 
-// Force RTL
-I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
-
-const {height: SCREEN_HEIGHT} = Dimensions.get('window');
-
 type InquiryTab = 'shahkar' | 'sabteahval' | 'bank';
-type ResultStatus = 'match' | 'no_match' | null;
+type BankSubTab = 'convert' | 'inquiry' | 'match';
 
-interface InquiryResult {
-  status: ResultStatus;
-  nationalCode: string;
-  phoneNumber: string;
-}
+const INQUIRY_TABS = [
+  {key: 'shahkar', label: 'سامانه شاهکار'},
+  {key: 'sabteahval', label: 'ثبت احوال'},
+  {key: 'bank', label: 'استعلام بانکی'},
+];
 
-// Convert to Persian numerals
-const toPersianNumber = (num: number | string): string => {
-  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  return String(num).replace(/\d/g, d => persianDigits[parseInt(d)]);
+const BANK_SUB_TABS = [
+  {key: 'convert', label: 'تبدیل کارت به شبا'},
+  {key: 'inquiry', label: 'استعلام شبا یا کارت'},
+  {key: 'match', label: 'تطابق شبا یا کارت با کدملی'},
+];
+
+const FEES = {
+  shahkar: 1400,
+  sabteahval: 1500,
+  bank: 1200,
 };
 
-// Format currency
-const formatCurrency = (amount: number): string => {
-  return toPersianNumber(amount.toLocaleString('en-US'));
+const FEE_DESCRIPTIONS = {
+  shahkar: 'هزینه انجام هر استعلام از سامانه شاهکار',
+  sabteahval: 'هزینه انجام هر استعلام از سامانه ثبت احوال',
+  bank: 'هزینه انجام هر استعلام از بانک',
 };
 
 export function InquiryScreen() {
-  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<InquiryTab>('shahkar');
-  const [nationalCode, setNationalCode] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [bankSubTab, setBankSubTab] = useState<BankSubTab>('match');
+
+  // Shahkar form
+  const [shahkarNationalCode, setShahkarNationalCode] = useState('');
+  const [shahkarPhone, setShahkarPhone] = useState('');
+
+  // Sabte Ahval form
+  const [sabteNationalCode, setSabteNationalCode] = useState('');
+  const [sabteBirthDate, setSabteBirthDate] = useState('');
+  const [sabteName, setSabteName] = useState('');
+  const [sabteLastName, setSabteLastName] = useState('');
+  const [sabteFatherName, setSabteFatherName] = useState('');
+
+  // Bank form
+  const [bankMatchNationalCode, setBankMatchNationalCode] = useState('');
+  const [bankMatchBirthDate, setBankMatchBirthDate] = useState('');
+  const [bankMatchIban, setBankMatchIban] = useState('');
+  const [bankConvertCard, setBankConvertCard] = useState('');
+  const [bankInquiryIban, setBankInquiryIban] = useState('');
+
+  // Common state
   const [loading, setLoading] = useState(false);
-  
-  // Payment drawer state
-  const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
   const [balance, setBalance] = useState(0);
-  const drawerAnimation = useRef(new Animated.Value(0)).current;
-  
-  // Result modal state
+  const [showPaymentDrawer, setShowPaymentDrawer] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
-  const [inquiryResult, setInquiryResult] = useState<InquiryResult | null>(null);
+  const [inquiryResult, setInquiryResult] = useState<InquiryResultData | null>(null);
 
-  const inquiryFee = 1400;
+  const currentFee = FEES[activeTab];
+  const currentFeeDescription = FEE_DESCRIPTIONS[activeTab];
 
-  const tabs: {key: InquiryTab; label: string}[] = [
-    {key: 'shahkar', label: 'سامانه شاهکار'},
-    {key: 'sabteahval', label: 'ثبت احوال'},
-    {key: 'bank', label: 'استعلام بانکی'},
-  ];
+  const isFormValid = useCallback(() => {
+    switch (activeTab) {
+      case 'shahkar':
+        return shahkarNationalCode.trim().length > 0 && shahkarPhone.trim().length > 0;
+      case 'sabteahval':
+        return (
+          sabteNationalCode.trim().length > 0 &&
+          sabteBirthDate.trim().length > 0 &&
+          sabteName.trim().length > 0 &&
+          sabteLastName.trim().length > 0 &&
+          sabteFatherName.trim().length > 0
+        );
+      case 'bank':
+        switch (bankSubTab) {
+          case 'match':
+            return (
+              bankMatchNationalCode.trim().length > 0 &&
+              bankMatchBirthDate.trim().length > 0 &&
+              bankMatchIban.trim().length > 0
+            );
+          case 'convert':
+            return bankConvertCard.trim().length > 0;
+          case 'inquiry':
+            return bankInquiryIban.trim().length > 0;
+          default:
+            return false;
+        }
+      default:
+        return false;
+    }
+  }, [
+    activeTab,
+    bankSubTab,
+    shahkarNationalCode,
+    shahkarPhone,
+    sabteNationalCode,
+    sabteBirthDate,
+    sabteName,
+    sabteLastName,
+    sabteFatherName,
+    bankMatchNationalCode,
+    bankMatchBirthDate,
+    bankMatchIban,
+    bankConvertCard,
+    bankInquiryIban,
+  ]);
 
-  const openPaymentDrawer = useCallback(async () => {
-    // Fetch balance using API service
-    const walletData = await WalletService.getBalance();
-    setBalance(walletData.balance);
-    setShowPaymentDrawer(true);
-    Animated.spring(drawerAnimation, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 11,
-    }).start();
-  }, [drawerAnimation]);
+  const handleInquiry = async () => {
+    if (!isFormValid()) return;
 
-  const closePaymentDrawer = useCallback(() => {
-    Animated.timing(drawerAnimation, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => setShowPaymentDrawer(false));
-  }, [drawerAnimation]);
-
-  const handleInquiry = () => {
-    if (!nationalCode.trim() || !phoneNumber.trim()) {
+    // Convert card to IBAN is FREE - no payment needed
+    if (activeTab === 'bank' && bankSubTab === 'convert') {
+      await handleConvertCard();
       return;
     }
-    openPaymentDrawer();
+
+    // Other services require payment
+    try {
+      const walletData = await WalletService.getBalance();
+      setBalance(walletData.balance);
+      setShowPaymentDrawer(true);
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    }
+  };
+
+  // Free service - Convert card to IBAN
+  const handleConvertCard = async () => {
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Format card number with spaces
+      const formattedCard = bankConvertCard.replace(/(\d{4})/g, '$1 ').trim();
+      
+      const result: InquiryResultData = {
+        type: 'bank',
+        subType: 'convert',
+        cardNumber: bankConvertCard,
+        convertedIban: 'IR702500000000569877258​42',
+      };
+
+      setInquiryResult(result);
+      setShowResultModal(true);
+    } catch (error) {
+      console.error('Convert failed:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePayAndInquiry = async () => {
-    closePaymentDrawer();
+    setShowPaymentDrawer(false);
     setLoading(true);
-    
+
     try {
-      // Process payment using API service
       await WalletService.processPayment({
-        amount: inquiryFee,
-        description: 'استعلام شاهکار',
+        amount: currentFee,
+        description: `استعلام ${INQUIRY_TABS.find(t => t.key === activeTab)?.label}`,
       });
-      
-      // Perform inquiry using API service
-      const response = await InquiryService.shahkarInquiry({
-        nationalCode,
-        phoneNumber,
-      });
-      
-      setInquiryResult({
-        status: response.isMatch ? 'match' : 'no_match',
-        nationalCode: response.nationalCode,
-        phoneNumber: response.phoneNumber,
-      });
+
+      let result: InquiryResultData;
+
+      switch (activeTab) {
+        case 'shahkar':
+          const shahkarResponse = await InquiryService.shahkarInquiry({
+            nationalCode: shahkarNationalCode,
+            phoneNumber: shahkarPhone,
+          });
+          result = {
+            type: 'shahkar',
+            isMatch: shahkarResponse.isMatch,
+            nationalCode: shahkarNationalCode,
+            phoneNumber: shahkarPhone,
+          };
+          break;
+
+        case 'sabteahval':
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          result = {
+            type: 'sabteahval',
+            nameMatch: Math.floor(Math.random() * 50) + 50,
+            lastNameMatch: 100,
+            fullNameMatch: Math.floor(Math.random() * 30) + 70,
+            fatherNameMatch: 100,
+          };
+          break;
+
+        case 'bank':
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          if (bankSubTab === 'match') {
+            result = {
+              type: 'bank',
+              subType: 'match',
+              isMatch: Math.random() > 0.3,
+              nationalCode: bankMatchNationalCode,
+              birthDate: bankMatchBirthDate || '۱۳۷۷/۰۴/۰۲',
+              iban: bankMatchIban.startsWith('IR') 
+                ? bankMatchIban 
+                : `IR${bankMatchIban}`,
+            };
+          } else if (bankSubTab === 'inquiry') {
+            // IBAN/Card inquiry - returns card number and IBAN like convert
+            const inputValue = bankInquiryIban.replace(/\s/g, '');
+            const isCard = inputValue.length === 16 && !inputValue.startsWith('IR');
+            result = {
+              type: 'bank',
+              subType: 'inquiry',
+              cardNumber: isCard ? inputValue : '۷۴۵۶ ۶۸۹۵ ۱۵۷۴ ۵۸۵۲',
+              convertedIban: isCard ? 'IR702500000000569877258​42' : inputValue,
+            };
+          } else {
+            throw new Error('Invalid bank sub-tab');
+          }
+          break;
+
+        default:
+          throw new Error('Invalid tab');
+      }
+
+      setInquiryResult(result);
       setShowResultModal(true);
     } catch (error) {
       console.error('Inquiry failed:', error);
@@ -123,299 +253,249 @@ export function InquiryScreen() {
     }
   };
 
-  const handleShare = async () => {
-    if (!inquiryResult) return;
-    
-    const message = inquiryResult.status === 'match'
-      ? `نتیجه استعلام شاهکار:\nکدملی: ${toPersianNumber(inquiryResult.nationalCode)}\nشماره همراه: ${toPersianNumber(inquiryResult.phoneNumber)}\nوضعیت: کدملی و شماره همراه تطابق دارند!`
-      : `نتیجه استعلام شاهکار:\nکدملی: ${toPersianNumber(inquiryResult.nationalCode)}\nشماره همراه: ${toPersianNumber(inquiryResult.phoneNumber)}\nوضعیت: کدملی و شماره همراه تطابق ندارند!`;
-    
-    try {
-      await Share.share({message});
-    } catch (error) {
-      console.error('Share failed:', error);
+  const handleCloseResult = () => {
+    setShowResultModal(false);
+    setInquiryResult(null);
+    // Reset forms
+    setShahkarNationalCode('');
+    setShahkarPhone('');
+    setSabteNationalCode('');
+    setSabteBirthDate('');
+    setSabteName('');
+    setSabteLastName('');
+    setSabteFatherName('');
+    setBankMatchNationalCode('');
+    setBankMatchBirthDate('');
+    setBankMatchIban('');
+    setBankConvertCard('');
+    setBankInquiryIban('');
+  };
+
+  const renderShahkarForm = () => (
+    <>
+      <Input
+        label="کد ملی"
+        value={shahkarNationalCode}
+        onChangeText={setShahkarNationalCode}
+        keyboardType="number-pad"
+        maxLength={10}
+      />
+      <Input
+        label="شماره تلفن"
+        value={shahkarPhone}
+        onChangeText={setShahkarPhone}
+        keyboardType="phone-pad"
+        maxLength={11}
+      />
+    </>
+  );
+
+  const renderSabteAhvalForm = () => (
+    <>
+      <Input
+        label="کد ملی"
+        value={sabteNationalCode}
+        onChangeText={setSabteNationalCode}
+        keyboardType="number-pad"
+        maxLength={10}
+      />
+      <Input
+        label="تاریخ تولد"
+        value={sabteBirthDate}
+        onChangeText={setSabteBirthDate}
+        rightIcon="calendar-outline"
+        keyboardType="number-pad"
+      />
+      <Input label="نام" value={sabteName} onChangeText={setSabteName} />
+      <Input label="نام خانوادگی" value={sabteLastName} onChangeText={setSabteLastName} />
+      <Input label="نام پدر" value={sabteFatherName} onChangeText={setSabteFatherName} />
+    </>
+  );
+
+  const renderBankForm = () => {
+    if (bankSubTab === 'match') {
+      return (
+        <>
+          <Input
+            label="کد ملی"
+            value={bankMatchNationalCode}
+            onChangeText={setBankMatchNationalCode}
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          <Input
+            label="تاریخ تولد"
+            value={bankMatchBirthDate}
+            onChangeText={setBankMatchBirthDate}
+            rightIcon="calendar-outline"
+            keyboardType="number-pad"
+          />
+          <Input
+            label="شماره شبا یا کارت"
+            value={bankMatchIban}
+            onChangeText={setBankMatchIban}
+          />
+        </>
+      );
+    }
+
+    if (bankSubTab === 'convert') {
+      return (
+        <Input
+          label="شماره کارت"
+          value={bankConvertCard}
+          onChangeText={setBankConvertCard}
+          keyboardType="number-pad"
+          maxLength={16}
+        />
+      );
+    }
+
+    if (bankSubTab === 'inquiry') {
+      return (
+        <Input
+          label="شماره شبا یا کارت"
+          value={bankInquiryIban}
+          onChangeText={setBankInquiryIban}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const renderForm = () => {
+    switch (activeTab) {
+      case 'shahkar':
+        return renderShahkarForm();
+      case 'sabteahval':
+        return renderSabteAhvalForm();
+      case 'bank':
+        return (
+          <>
+            <SubTabSelector
+              tabs={BANK_SUB_TABS}
+              activeTab={bankSubTab}
+              onTabChange={(key) => setBankSubTab(key as BankSubTab)}
+            />
+            {/* Show description for convert, fee notice for others */}
+            {bankSubTab === 'convert' ? (
+              <Text variant="body" color="secondary" align="center" style={{marginBottom: spacing['2xl']}}>
+                برای تبدیل شماره کارت را وارد کنید
+              </Text>
+            ) : (
+              <FeeNotice serviceName="بانک" fee={FEES.bank} />
+            )}
+            {renderBankForm()}
+          </>
+        );
+      default:
+        return null;
     }
   };
 
-  const handleBack = () => {
-    setShowResultModal(false);
-    setInquiryResult(null);
-    setNationalCode('');
-    setPhoneNumber('');
+  const getButtonTitle = () => {
+    if (loading) return 'در حال استعلام...';
+    if (activeTab === 'bank' && bankSubTab === 'convert') return 'تبدیل';
+    return 'استعلام';
   };
 
-  const drawerTranslateY = drawerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [300, 0],
-  });
-
   return (
-    <View className="flex-1 bg-background-dark">
-      {/* Header */}
-      <View
-        className="flex-row items-center justify-between px-5"
-        style={{paddingTop: insets.top + 12}}>
-        <TouchableOpacity className="p-2">
-          <Icon name="menu" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
-        <View className="flex-row items-center">
-          <Text className="text-primary-400 text-2xl font-bold">+</Text>
-          <Text className="text-white text-2xl font-bold mr-1">گلدچی</Text>
-        </View>
-      </View>
+    <View style={styles.container}>
+      <AppHeader />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{flexGrow: 1}}
-        showsVerticalScrollIndicator={false}>
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
         
-        {/* Title */}
-        <View className="flex-row items-center justify-center mt-8 mb-6 px-5">
-          <View className="flex-1 h-px bg-primary-400/30" />
-          <Text className="text-white text-xl font-semibold mx-4">استعلامات</Text>
-          <View className="flex-1 h-px bg-primary-400/30" />
-        </View>
+        <PageTitle title="استعلامات" />
 
-        {/* Tabs */}
-        <View className="flex-row mx-5 mb-6">
-          {tabs.map(tab => (
-            <TouchableOpacity
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              className={`flex-1 py-3 rounded-xl mx-1 items-center ${
-                activeTab === tab.key
-                  ? 'bg-primary-400'
-                  : 'bg-transparent border border-primary-400/50'
-              }`}
-              activeOpacity={0.8}>
-              <Text
-                className={`font-medium ${
-                  activeTab === tab.key ? 'text-background-dark' : 'text-primary-400'
-                }`}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TabSelector
+          tabs={INQUIRY_TABS}
+          activeTab={activeTab}
+          onTabChange={(key) => setActiveTab(key as InquiryTab)}
+        />
 
         {/* Card Container */}
-        <View className="mx-5 bg-background-card rounded-2xl p-6">
-          {/* Fee Notice */}
-          <View className="bg-background-input rounded-xl px-4 py-4 mb-6">
-            <Text className="text-text-secondary text-sm text-center leading-6">
-              هزینه انجام هر استعلام از سامانه شاهکار
-            </Text>
-            <Text className="text-text-secondary text-sm text-center">
-              {toPersianNumber('۱٫۴۰۰')} تومان می باشد!
-            </Text>
-          </View>
-
-          {/* National Code Input */}
-          <View className="mb-4">
-            <Text className="text-white text-sm mb-2 text-right">کد ملی</Text>
-            <TextInput
-              className="bg-background-input border border-border-input rounded-xl px-4 py-4 text-white text-base text-right"
-              placeholder="وارد کنید..."
-              placeholderTextColor="#5A7A7D"
-              keyboardType="number-pad"
-              value={nationalCode}
-              onChangeText={setNationalCode}
-              maxLength={10}
+        <View style={styles.card}>
+          {activeTab !== 'bank' && (
+            <FeeNotice
+              serviceName={
+                activeTab === 'shahkar' ? 'سامانه شاهکار' : 'سامانه ثبت احوال'
+              }
+              fee={currentFee}
             />
-          </View>
-
-          {/* Phone Number Input */}
-          <View className="mb-4">
-            <Text className="text-white text-sm mb-2 text-right">شماره تلفن</Text>
-            <TextInput
-              className="bg-background-input border border-border-input rounded-xl px-4 py-4 text-white text-base text-right"
-              placeholder="وارد کنید..."
-              placeholderTextColor="#5A7A7D"
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              maxLength={11}
-            />
-          </View>
+          )}
+          {renderForm()}
         </View>
 
         {/* Spacer */}
-        <View className="flex-1" />
+        <View style={styles.spacer} />
 
         {/* Submit Button */}
-        <View className="mx-5 mb-6">
-          <TouchableOpacity
-            className={`bg-primary-400 rounded-xl py-4 items-center ${
-              loading ? 'opacity-70' : ''
-            }`}
+        <View style={styles.buttonContainer}>
+          <Button
+            title={getButtonTitle()}
+            loading={loading}
+            disabled={!isFormValid()}
             onPress={handleInquiry}
-            disabled={loading || !nationalCode.trim() || !phoneNumber.trim()}
-            activeOpacity={0.8}>
-            <Text className="text-background-dark text-lg font-semibold">
-              {loading ? 'در حال استعلام...' : 'استعلام'}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       </ScrollView>
 
-      {/* Bottom Tab Bar */}
-      <View
-        className="flex-row bg-background-card rounded-t-3xl mx-4"
-        style={{paddingBottom: insets.bottom + 8, paddingTop: 16}}>
-        <TouchableOpacity className="flex-1 items-center">
-          <Icon name="pricetag-outline" size={24} color="#A0B4B7" />
-          <Text className="text-text-secondary text-xs mt-1">قیمت ها</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="flex-1 items-center">
-          <Icon name="calculator-outline" size={24} color="#A0B4B7" />
-          <Text className="text-text-secondary text-xs mt-1">محاسبه</Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="flex-1 items-center">
-          <Icon name="document-text" size={24} color="#3ECFB2" />
-          <Text className="text-primary-400 text-xs mt-1">استعلام</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomTabBar activeTab="inquiry" />
 
       {/* Payment Drawer */}
-      {showPaymentDrawer && (
-        <Modal
-          transparent
-          visible={showPaymentDrawer}
-          animationType="none"
-          onRequestClose={closePaymentDrawer}>
-          <TouchableOpacity
-            className="flex-1 bg-black/50"
-            activeOpacity={1}
-            onPress={closePaymentDrawer}>
-            <View className="flex-1" />
-            <Animated.View
-              style={{transform: [{translateY: drawerTranslateY}]}}
-              className="bg-background-card rounded-t-3xl px-5 pt-6 pb-8">
-              <TouchableOpacity activeOpacity={1}>
-                {/* Drawer Handle */}
-                <View className="w-12 h-1 bg-text-muted rounded-full self-center mb-6" />
-
-                {/* Fee Notice */}
-                <View className="mb-6">
-                  <Text className="text-text-secondary text-sm text-center leading-6">
-                    هزینه انجام هر استعلام از سامانه شاهکار
-                  </Text>
-                  <Text className="text-text-secondary text-sm text-center">
-                    {toPersianNumber('۱٫۴۰۰')} تومان می باشد!
-                  </Text>
-                </View>
-
-                {/* Balance Card */}
-                <View className="flex-row items-center bg-background-input border border-primary-400/30 rounded-xl mb-6">
-                  <TouchableOpacity className="bg-background-elevated p-4 rounded-r-xl">
-                    <Icon name="add" size={24} color="#3ECFB2" />
-                  </TouchableOpacity>
-                  <View className="flex-1 flex-row items-center justify-between px-4 py-4">
-                    <Text className="text-white text-lg font-semibold">
-                      {formatCurrency(balance)} تومان
-                    </Text>
-                    <View className="flex-row items-center">
-                      <Text className="text-text-secondary text-sm mr-2">موجودی</Text>
-                      <Icon name="wallet-outline" size={18} color="#A0B4B7" />
-                    </View>
-                  </View>
-                </View>
-
-                {/* Pay Button */}
-                <TouchableOpacity
-                  className="bg-primary-400 rounded-xl py-4 items-center"
-                  onPress={handlePayAndInquiry}
-                  activeOpacity={0.8}>
-                  <Text className="text-background-dark text-lg font-semibold">
-                    پرداخت و استعلام
-                  </Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </Animated.View>
-          </TouchableOpacity>
-        </Modal>
-      )}
+      <PaymentDrawer
+        visible={showPaymentDrawer}
+        onClose={() => setShowPaymentDrawer(false)}
+        onPayment={handlePayAndInquiry}
+        balance={balance}
+        fee={currentFee}
+        feeDescription={currentFeeDescription}
+        loading={loading}
+      />
 
       {/* Result Modal */}
-      {showResultModal && inquiryResult && (
-        <Modal
-          transparent
-          visible={showResultModal}
-          animationType="fade"
-          onRequestClose={handleBack}>
-          <View className="flex-1 bg-black/70 justify-center px-5">
-            <View className="bg-background-card rounded-2xl overflow-hidden">
-              {/* Title */}
-              <View className="py-5 border-b border-border-input">
-                <Text className="text-white text-xl font-semibold text-center">
-                  نتیجه استعلام
-                </Text>
-              </View>
-
-              {/* Status Banner */}
-              <View
-                className={`mx-5 mt-5 rounded-xl px-4 py-4 flex-row items-center justify-center ${
-                  inquiryResult.status === 'match'
-                    ? 'bg-primary-400/15'
-                    : 'bg-accent-error/15'
-                }`}>
-                <Text
-                  className={`text-base mr-2 ${
-                    inquiryResult.status === 'match'
-                      ? 'text-primary-400'
-                      : 'text-accent-error'
-                  }`}>
-                  {inquiryResult.status === 'match'
-                    ? 'کدملی و شماره همراه تطابق دارند!'
-                    : 'کدملی و شماره همراه تطابق ندارند!'}
-                </Text>
-                <Icon
-                  name="information-circle"
-                  size={20}
-                  color={inquiryResult.status === 'match' ? '#3ECFB2' : '#FF6B6B'}
-                />
-              </View>
-
-              {/* National Code */}
-              <View className="mx-5 mt-4 bg-background-input rounded-xl px-4 py-4 flex-row items-center justify-between">
-                <Text className="text-white text-base">
-                  {toPersianNumber(inquiryResult.nationalCode)}
-                </Text>
-                <Text className="text-text-secondary text-sm">کدملی</Text>
-              </View>
-
-              {/* Phone Number */}
-              <View className="mx-5 mt-3 bg-background-input rounded-xl px-4 py-4 flex-row items-center justify-between">
-                <Text className="text-white text-base">
-                  {toPersianNumber(inquiryResult.phoneNumber)}
-                </Text>
-                <Text className="text-text-secondary text-sm">شماره همراه</Text>
-              </View>
-
-              {/* Action Buttons */}
-              <View className="flex-row mx-5 mt-6 mb-6">
-                <TouchableOpacity
-                  className="flex-1 bg-background-input rounded-xl py-4 items-center mr-2"
-                  onPress={handleBack}
-                  activeOpacity={0.8}>
-                  <Text className="text-primary-400 text-base font-semibold">
-                    بازگشت
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="flex-1 bg-background-input rounded-xl py-4 flex-row items-center justify-center ml-2"
-                  onPress={handleShare}
-                  activeOpacity={0.8}>
-                  <Text className="text-primary-400 text-base font-semibold mr-2">
-                    اشتراک
-                  </Text>
-                  <Icon name="share-social-outline" size={20} color="#3ECFB2" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
+      <ResultModal
+        visible={showResultModal}
+        onClose={handleCloseResult}
+        result={inquiryResult}
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+  },
+
+  card: {
+    marginHorizontal: spacing.screenPadding,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing.cardPadding,
+  },
+
+  spacer: {
+    flex: 1,
+    minHeight: spacing.xl,
+  },
+
+  buttonContainer: {
+    marginHorizontal: spacing.screenPadding,
+    marginBottom: spacing['2xl'],
+  },
+});

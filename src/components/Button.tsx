@@ -1,13 +1,21 @@
+/**
+ * Button Component
+ */
+
 import React from 'react';
 import {
   TouchableOpacity,
-  Text,
-  ActivityIndicator,
   TouchableOpacityProps,
+  StyleSheet,
+  ActivityIndicator,
   View,
 } from 'react-native';
+import {Text} from './Text';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {borderRadius} from '../theme/borderRadius';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type ButtonVariant = 'filled' | 'outline' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends TouchableOpacityProps {
@@ -15,83 +23,116 @@ interface ButtonProps extends TouchableOpacityProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  fullWidth?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  fullWidth?: boolean;
 }
-
-const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-primary-500 active:bg-primary-600',
-  secondary: 'bg-secondary-600 active:bg-secondary-700',
-  outline: 'bg-transparent border border-primary-500',
-  ghost: 'bg-transparent',
-};
-
-const variantTextClasses: Record<ButtonVariant, string> = {
-  primary: 'text-secondary-900',
-  secondary: 'text-text-primary',
-  outline: 'text-primary-500',
-  ghost: 'text-text-primary',
-};
-
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'py-2 px-4',
-  md: 'py-3 px-6',
-  lg: 'py-4 px-8',
-};
-
-const textSizeClasses: Record<ButtonSize, string> = {
-  sm: 'text-sm',
-  md: 'text-base',
-  lg: 'text-lg',
-};
 
 export function Button({
   title,
-  variant = 'primary',
-  size = 'md',
+  variant = 'filled',
+  size = 'lg',
   loading = false,
+  fullWidth = true,
   leftIcon,
   rightIcon,
-  fullWidth = false,
   disabled,
-  className = '',
+  style,
   ...props
-}: ButtonProps & {className?: string}) {
+}: ButtonProps) {
   const isDisabled = disabled || loading;
+
+  const buttonStyles = [
+    styles.base,
+    styles[variant],
+    styles[`size_${size}`],
+    fullWidth && styles.fullWidth,
+    isDisabled && styles.disabled,
+    style,
+  ];
+
+  const textColor = variant === 'filled' ? colors.background.primary : colors.primary[400];
 
   return (
     <TouchableOpacity
-      className={`
-        flex-row items-center justify-center rounded-xl
-        ${variantClasses[variant]}
-        ${sizeClasses[size]}
-        ${fullWidth ? 'w-full' : ''}
-        ${isDisabled ? 'opacity-50' : ''}
-        ${className}
-      `}
+      style={buttonStyles}
       disabled={isDisabled}
       activeOpacity={0.8}
       {...props}>
       {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? '#0D0D1A' : '#FFB800'}
-          size="small"
-        />
+        <ActivityIndicator color={textColor} />
       ) : (
-        <>
-          {leftIcon && <View className="mr-2">{leftIcon}</View>}
+        <View style={styles.content}>
+          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
           <Text
-            className={`
-              font-semibold
-              ${variantTextClasses[variant]}
-              ${textSizeClasses[size]}
-            `}>
+            variant="button"
+            style={[styles.text, {color: textColor}]}>
             {title}
           </Text>
-          {rightIcon && <View className="ml-2">{rightIcon}</View>}
-        </>
+          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        </View>
       )}
     </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  base: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.xl,
+  },
+  
+  // Variants
+  filled: {
+    backgroundColor: colors.primary[400],
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary[400],
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+  },
+
+  // Sizes
+  size_sm: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  size_md: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  size_lg: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing['2xl'],
+  },
+
+  fullWidth: {
+    width: '100%',
+  },
+
+  disabled: {
+    opacity: 0.5,
+  },
+
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  text: {
+    textAlign: 'center',
+  },
+
+  iconLeft: {
+    marginRight: spacing.sm,
+  },
+
+  iconRight: {
+    marginLeft: spacing.sm,
+  },
+});

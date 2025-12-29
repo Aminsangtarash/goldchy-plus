@@ -1,45 +1,75 @@
-import React from 'react';
-import {View, ViewProps} from 'react-native';
+/**
+ * Card Component
+ */
 
-type CardVariant = 'default' | 'elevated' | 'outlined' | 'gold';
+import React from 'react';
+import {View, ViewProps, StyleSheet} from 'react-native';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {borderRadius} from '../theme/borderRadius';
+
+type CardVariant = 'default' | 'elevated' | 'outlined' | 'primary';
 
 interface CardProps extends ViewProps {
   variant?: CardVariant;
   padding?: 'none' | 'sm' | 'md' | 'lg';
-  className?: string;
 }
-
-const variantClasses: Record<CardVariant, string> = {
-  default: 'bg-background-card',
-  elevated: 'bg-background-elevated',
-  outlined: 'bg-background-card border border-white/10',
-  gold: 'bg-background-card border border-primary-500/30',
-};
-
-const paddingClasses = {
-  none: '',
-  sm: 'p-3',
-  md: 'p-4',
-  lg: 'p-6',
-};
 
 export function Card({
   variant = 'default',
   padding = 'md',
-  className = '',
+  style,
   children,
   ...props
 }: CardProps) {
   return (
     <View
-      className={`
-        rounded-xl
-        ${variantClasses[variant]}
-        ${paddingClasses[padding]}
-        ${className}
-      `}
+      style={[
+        styles.base,
+        styles[variant],
+        styles[`padding_${padding}`],
+        style,
+      ]}
       {...props}>
       {children}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  base: {
+    borderRadius: borderRadius['2xl'],
+  },
+
+  // Variants
+  default: {
+    backgroundColor: colors.background.secondary,
+  },
+  elevated: {
+    backgroundColor: colors.background.tertiary,
+  },
+  outlined: {
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  primary: {
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+
+  // Padding
+  padding_none: {
+    padding: 0,
+  },
+  padding_sm: {
+    padding: spacing.md,
+  },
+  padding_md: {
+    padding: spacing.lg,
+  },
+  padding_lg: {
+    padding: spacing.cardPadding,
+  },
+});

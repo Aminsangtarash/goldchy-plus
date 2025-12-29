@@ -1,8 +1,5 @@
 module.exports = {
-  presets: [
-    ['@react-native/babel-preset', {jsxImportSource: 'nativewind'}],
-    'nativewind/babel',
-  ],
+  presets: ['@react-native/babel-preset'],
   plugins: [
     'react-native-reanimated/plugin',
     [
@@ -15,11 +12,10 @@ module.exports = {
           '@components': './src/components',
           '@screens': './src/screens',
           '@navigation': './src/navigation',
+          '@theme': './src/theme',
+          '@services': './src/services',
           '@hooks': './src/hooks',
           '@utils': './src/utils',
-          '@constants': './src/constants',
-          '@assets': './src/assets',
-          '@services': './src/services',
         },
       },
     ],

@@ -1,6 +1,21 @@
+/**
+ * Input Component
+ */
+
 import React, {useState} from 'react';
-import {View, TextInput, Text, TextInputProps, TouchableOpacity} from 'react-native';
+import {
+  View,
+  TextInput,
+  TextInputProps,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {Text} from './Text';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {borderRadius} from '../theme/borderRadius';
+import {fontSize} from '../theme/typography';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -8,7 +23,6 @@ interface InputProps extends TextInputProps {
   leftIcon?: string;
   rightIcon?: string;
   onRightIconPress?: () => void;
-  containerClassName?: string;
 }
 
 export function Input({
@@ -17,8 +31,8 @@ export function Input({
   leftIcon,
   rightIcon,
   onRightIconPress,
-  containerClassName = '',
   secureTextEntry,
+  style,
   ...props
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -32,33 +46,32 @@ export function Input({
     }
   };
 
+  const containerStyles = [
+    styles.container,
+    isFocused && styles.containerFocused,
+    error && styles.containerError,
+  ];
+
   return (
-    <View className={`w-full ${containerClassName}`}>
+    <View style={styles.wrapper}>
       {label && (
-        <Text className="text-text-secondary text-sm mb-2 font-medium">
+        <Text variant="label" color="primary" style={styles.label}>
           {label}
         </Text>
       )}
-      <View
-        className={`
-          flex-row items-center
-          bg-background-elevated rounded-xl
-          px-4 py-3
-          border
-          ${isFocused ? 'border-primary-500' : 'border-transparent'}
-          ${error ? 'border-accent-error' : ''}
-        `}>
+      <View style={containerStyles}>
         {leftIcon && (
           <Icon
             name={leftIcon}
             size={20}
-            color={isFocused ? '#FFB800' : '#6B6B80'}
-            style={{marginRight: 12}}
+            color={isFocused ? colors.primary[400] : colors.text.muted}
+            style={styles.leftIcon}
           />
         )}
         <TextInput
-          className="flex-1 text-text-primary text-base"
-          placeholderTextColor="#6B6B80"
+          style={[styles.input, style]}
+          placeholderTextColor={colors.text.placeholder}
+          placeholder="وارد کنید..."
           secureTextEntry={isSecure}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -75,12 +88,63 @@ export function Input({
                   : rightIcon!
               }
               size={20}
-              color="#6B6B80"
+              color={colors.text.muted}
             />
           </TouchableOpacity>
         )}
       </View>
-      {error && <Text className="text-accent-error text-sm mt-1">{error}</Text>}
+      {error && (
+        <Text variant="labelSmall" color="error" style={styles.error}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginBottom: spacing.lg,
+  },
+
+  label: {
+    marginBottom: spacing.sm,
+    textAlign: 'right',
+  },
+
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.input,
+    borderWidth: 1,
+    borderColor: colors.border.input,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+
+  containerFocused: {
+    borderColor: colors.primary[400],
+  },
+
+  containerError: {
+    borderColor: colors.status.error,
+  },
+
+  leftIcon: {
+    marginRight: spacing.md,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text.primary,
+    textAlign: 'right',
+    padding: 0,
+  },
+
+  error: {
+    marginTop: spacing.xs,
+    textAlign: 'right',
+  },
+});

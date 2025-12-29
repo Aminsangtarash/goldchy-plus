@@ -1,5 +1,8 @@
-// API Configuration
-const API_BASE_URL = 'https://api.goldchy.com'; // Replace with actual API URL
+/**
+ * API Service
+ */
+
+const API_BASE_URL = 'https://api.goldchy.com';
 
 // Types
 export interface ShahkarInquiryRequest {
@@ -12,32 +15,6 @@ export interface ShahkarInquiryResponse {
   isMatch: boolean;
   nationalCode: string;
   phoneNumber: string;
-  message?: string;
-}
-
-export interface SabteAhvalInquiryRequest {
-  nationalCode: string;
-}
-
-export interface SabteAhvalInquiryResponse {
-  success: boolean;
-  firstName?: string;
-  lastName?: string;
-  fatherName?: string;
-  birthDate?: string;
-  message?: string;
-}
-
-export interface BankInquiryRequest {
-  cardNumber?: string;
-  iban?: string;
-  accountNumber?: string;
-}
-
-export interface BankInquiryResponse {
-  success: boolean;
-  bankName?: string;
-  ownerName?: string;
   message?: string;
 }
 
@@ -74,10 +51,7 @@ class ApiClient {
     this.token = null;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(this.token && {Authorization: `Bearer ${this.token}`}),
@@ -112,20 +86,11 @@ const apiClient = new ApiClient(API_BASE_URL);
 
 // Inquiry Service
 export const InquiryService = {
-  /**
-   * Shahkar system inquiry - verify national code and phone number match
-   */
-  shahkarInquiry: async (
-    request: ShahkarInquiryRequest,
-  ): Promise<ShahkarInquiryResponse> => {
+  shahkarInquiry: async (request: ShahkarInquiryRequest): Promise<ShahkarInquiryResponse> => {
     try {
-      return await apiClient.post<ShahkarInquiryResponse>(
-        '/inquiry/shahkar',
-        request,
-      );
+      return await apiClient.post<ShahkarInquiryResponse>('/inquiry/shahkar', request);
     } catch (error) {
       // Mock response for development
-      console.log('Using mock response for shahkar inquiry');
       await new Promise(resolve => setTimeout(resolve, 1500));
       const isMatch = Math.random() > 0.5;
       return {
@@ -133,57 +98,6 @@ export const InquiryService = {
         isMatch,
         nationalCode: request.nationalCode,
         phoneNumber: request.phoneNumber,
-        message: isMatch
-          ? 'کدملی و شماره همراه تطابق دارند'
-          : 'کدملی و شماره همراه تطابق ندارند',
-      };
-    }
-  },
-
-  /**
-   * Sabte Ahval inquiry - get personal information by national code
-   */
-  sabteAhvalInquiry: async (
-    request: SabteAhvalInquiryRequest,
-  ): Promise<SabteAhvalInquiryResponse> => {
-    try {
-      return await apiClient.post<SabteAhvalInquiryResponse>(
-        '/inquiry/sabteahval',
-        request,
-      );
-    } catch (error) {
-      // Mock response for development
-      console.log('Using mock response for sabte ahval inquiry');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      return {
-        success: true,
-        firstName: 'علی',
-        lastName: 'محمدی',
-        fatherName: 'حسین',
-        birthDate: '۱۳۷۰/۰۵/۱۵',
-      };
-    }
-  },
-
-  /**
-   * Bank inquiry - get bank account information
-   */
-  bankInquiry: async (
-    request: BankInquiryRequest,
-  ): Promise<BankInquiryResponse> => {
-    try {
-      return await apiClient.post<BankInquiryResponse>(
-        '/inquiry/bank',
-        request,
-      );
-    } catch (error) {
-      // Mock response for development
-      console.log('Using mock response for bank inquiry');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      return {
-        success: true,
-        bankName: 'بانک ملت',
-        ownerName: 'علی محمدی',
       };
     }
   },
@@ -191,120 +105,64 @@ export const InquiryService = {
 
 // Wallet Service
 export const WalletService = {
-  /**
-   * Get user wallet balance
-   */
   getBalance: async (): Promise<WalletBalance> => {
     try {
       return await apiClient.get<WalletBalance>('/wallet/balance');
     } catch (error) {
       // Mock response for development
-      console.log('Using mock response for wallet balance');
       await new Promise(resolve => setTimeout(resolve, 500));
-      return {
-        balance: 3256000,
-        currency: 'IRR',
-      };
+      return {balance: 3256000, currency: 'IRR'};
     }
   },
 
-  /**
-   * Add funds to wallet
-   */
-  addFunds: async (amount: number): Promise<PaymentResponse> => {
+  processPayment: async (request: PaymentRequest): Promise<PaymentResponse> => {
     try {
-      return await apiClient.post<PaymentResponse>('/wallet/add-funds', {
-        amount,
-      });
+      return await apiClient.post<PaymentResponse>('/wallet/payment', request);
     } catch (error) {
       // Mock response for development
-      console.log('Using mock response for add funds');
       await new Promise(resolve => setTimeout(resolve, 1000));
-      return {
-        success: true,
-        transactionId: `TXN${Date.now()}`,
-      };
-    }
-  },
-
-  /**
-   * Process payment from wallet
-   */
-  processPayment: async (
-    request: PaymentRequest,
-  ): Promise<PaymentResponse> => {
-    try {
-      return await apiClient.post<PaymentResponse>(
-        '/wallet/payment',
-        request,
-      );
-    } catch (error) {
-      // Mock response for development
-      console.log('Using mock response for payment');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return {
-        success: true,
-        transactionId: `TXN${Date.now()}`,
-      };
+      return {success: true, transactionId: `TXN${Date.now()}`};
     }
   },
 };
 
 // Auth Service
 export const AuthService = {
-  /**
-   * Send OTP to phone number
-   */
   sendOTP: async (phoneNumber: string): Promise<{success: boolean; message?: string}> => {
     try {
       return await apiClient.post('/auth/send-otp', {phoneNumber});
     } catch (error) {
       // Mock response for development
-      console.log('Using mock response for send OTP');
       await new Promise(resolve => setTimeout(resolve, 1000));
       return {success: true};
     }
   },
 
-  /**
-   * Verify OTP and login
-   */
   verifyOTP: async (
     phoneNumber: string,
     otp: string,
   ): Promise<{success: boolean; token?: string; message?: string}> => {
     try {
-      const response = await apiClient.post<{
-        success: boolean;
-        token?: string;
-        message?: string;
-      }>('/auth/verify-otp', {phoneNumber, otp});
-      
+      const response = await apiClient.post<{success: boolean; token?: string; message?: string}>(
+        '/auth/verify-otp',
+        {phoneNumber, otp},
+      );
       if (response.success && response.token) {
         apiClient.setToken(response.token);
       }
-      
       return response;
     } catch (error) {
       // Mock response for development
-      console.log('Using mock response for verify OTP');
       await new Promise(resolve => setTimeout(resolve, 1000));
       const mockToken = `mock_token_${Date.now()}`;
       apiClient.setToken(mockToken);
-      return {
-        success: true,
-        token: mockToken,
-      };
+      return {success: true, token: mockToken};
     }
   },
 
-  /**
-   * Logout
-   */
   logout: () => {
     apiClient.clearToken();
   },
 };
 
-// Export API client for direct use if needed
 export {apiClient};
